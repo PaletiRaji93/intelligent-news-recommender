@@ -10,3 +10,5 @@ joblib
 jupyter
 ipykernel
 wordcloud
+gensim
+joblib
