@@ -1,70 +1,96 @@
 import numpy as np
 import pandas as pd
-
 from sklearn.metrics.pairwise import cosine_similarity
 
 
 class NewsRecommender:
 
     def __init__(self, vectorizer, news_data):
-        """
-        Initialize the recommendation system.
-
-        Parameters
-        ----------
-        vectorizer : fitted TF-IDF vectorizer
-            The TF-IDF vectorizer trained on the training corpus.
-
-        news_data : pandas DataFrame
-            DataFrame containing the news articles.
-        """
-
         self.vectorizer = vectorizer
         self.news_data = news_data.copy()
 
-        # Convert all article text into TF-IDF vectors
+        # Convert all news articles into TF-IDF vectors
         self.tfidf_matrix = self.vectorizer.transform(
             self.news_data["clean_text"].fillna("")
         )
 
-    def recommend(self, query, top_k=5):
+    def recommend(
+        self,
+        query,
+        top_k=5,
+        exclude_index=None
+    ):
         """
         Recommend the most similar news articles.
 
         Parameters
         ----------
         query : str
-            Input news article or text.
+            News article text or user query.
 
         top_k : int
-            Number of recommendations.
+            Number of recommendations to return.
+
+        exclude_index : int, optional
+            Index of the article to exclude from recommendations.
 
         Returns
         -------
         pandas.DataFrame
-            Recommended articles.
+            Top recommended articles with similarity scores.
         """
+
+        # -------------------------------------------------
+        # Validate query
+        # -------------------------------------------------
 
         if not isinstance(query, str) or not query.strip():
             raise ValueError(
                 "Query must be a non-empty string."
             )
 
+        # -------------------------------------------------
         # Convert query into TF-IDF vector
+        # -------------------------------------------------
+
         query_vector = self.vectorizer.transform([query])
 
+        # -------------------------------------------------
         # Calculate cosine similarity
+        # -------------------------------------------------
+
         similarity_scores = cosine_similarity(
             query_vector,
             self.tfidf_matrix
         )[0]
 
-        # Get indices of highest similarity scores
+        # -------------------------------------------------
+        # Exclude original article
+        # -------------------------------------------------
+
+        if exclude_index is not None:
+
+            # Accept both native Python ints and numpy integer types
+            # (e.g. values coming from DataFrame.iloc / .name), which
+            # `isinstance(exclude_index, int)` alone would reject.
+            if (
+                isinstance(exclude_index, (int, np.integer))
+                and 0 <= exclude_index < len(similarity_scores)
+            ):
+                similarity_scores[int(exclude_index)] = -1
+
+        # -------------------------------------------------
+        # Get top-k articles
+        # -------------------------------------------------
+
         top_indices = np.argsort(
             similarity_scores
         )[::-1][:top_k]
 
-        # Copy recommended articles
+        # -------------------------------------------------
+        # Create recommendation DataFrame
+        # -------------------------------------------------
+
         recommendations = self.news_data.iloc[
             top_indices
         ].copy()
